@@ -1,0 +1,34 @@
+{"alarmid":"1","alarmTitle":"门禁警报","deviceModel":"outdoor-01","alarmSource":"234","alarmMsg":"红外警报被触发","alarmTime":"2019-04-09 11:19:24"}
+{"alarmid":"2","alarmTitle":"厨房警报","deviceModel":"indoor-982","alarmSource":"456","alarmMsg":"烟雾报警","alarmTime":"2019-04-11 21:18:29"}
+{"alarmid":"3","alarmTitle":"水泵警报","deviceModel":"lids-231","alarmSource":"489","alarmMsg":"安全锁被打开","alarmTime":"2019-04-16 13:24:19"}
+{"alarmid":"4","alarmTitle":"门禁警报","deviceModel":"outdoor-02","alarmSource":"234","alarmMsg":"红外警报被触发","alarmTime":"2019-04-21 21:18:24"}
+{"alarmid":"5","alarmTitle":"厨房警报","deviceModel":"indoor-983","alarmSource":"456","alarmMsg":"烟雾报警","alarmTime":"2019-04-29 19:18:24"}
+{"alarmid":"6","alarmTitle":"水泵警报","deviceModel":"lids-232","alarmSource":"489","alarmMsg":"安全锁被打开","alarmTime":"2019-04-30 06:18:24"}
+{"alarmid":"7","alarmTitle":"门禁警报","deviceModel":"outdoor-03","alarmSource":"234","alarmMsg":"红外警报被触发","alarmTime":"2019-05-01 12:18:24"}
+{"alarmid":"8","alarmTitle":"厨房警报","deviceModel":"indoor-985","alarmSource":"456","alarmMsg":"烟雾报警","alarmTime":"2019-05-04 11:13:24"}
+{"alarmid":"9","alarmTitle":"水泵警报","deviceModel":"lids-236","alarmSource":"489","alarmMsg":"安全锁被打开","alarmTime":"2019-05-06 01:49:24"}
+{"alarmid":"10","alarmTitle":"门禁警报","deviceModel":"door-01","alarmSource":"234","alarmMsg":"红外警报被触发","alarmTime":"2019-05-09 01:32:24"}
+{"alarmid":"10","alarmTitle":"门禁警报","deviceModel":"door-01","alarmSource":"234","alarmMsg":"红外警报被触发","alarmTime":"1557475601929"}
+
+(1) JSON对象字段值可以为"",但是字段不能缺少，一旦缺少后就会出现null，在序列化入库的过程中会报错。这种情况通过给实体类属性设置默认值来解决。
+(2) Beam中DateTime会按org.joda.time.base类型进行校验，如果日期不为这种类型则报错
+(3) Beam的 2.11.0版本中convertAvroFieldStrict不支持Datetime值转换  https://github.com/apache/beam/pull/8376
+
+======================CK=====================
+CREATE DATABASE alarm;
+USE alarm;
+
+CREATE TABLE alarm.ct_alarm_info (
+    alarmid String,
+    alarmTitle Nullable(String),
+    deviceModel Nullable(String),
+    alarmSource Nullable(Int32),
+    alarmMsg Nullable(String),
+    alarmTime Nullable(String)
+) ENGINE = Log;
+
+
+======================Kafka=====================
+./kafka-topics.sh --create --zookeeper 172.30.154.241:12181 --replication-factor 2 --partitions 1 --topic TopicAlarm
+
+./kafka-console-producer.sh --broker-list 172.30.154.241:9092 --topic TopicAlarm

@@ -3,7 +3,7 @@ package com.example.demo.clickhouse;
 import java.sql.*;
 
 /**
- * Description：describe this class function
+ * Description：CK的JDBC连接方式
  * Author；JinHuatao
  * Date: 2019/4/24 15:52
  */
@@ -11,18 +11,21 @@ public class ClickhouseClientDemo {
 
     public static void main(String[] args) {
         try {
-            batchQuery();
+            //batchQuery();
+            simpleQuery();
         }catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    public void simpleQuery() throws Exception{
+    public static void simpleQuery() throws Exception{
         Class.forName("com.github.housepower.jdbc.ClickHouseDriver");
-        Connection connection = DriverManager.getConnection("jdbc:clickhouse://172.30.154.241:9000");
+        Connection connection = DriverManager.getConnection("jdbc:clickhouse://172.30.154.241:8123");
 
         Statement stmt = connection.createStatement();
-        ResultSet rs = stmt.executeQuery("SELECT (number % 3 + 1) as n, sum(number) FROM numbers(10000000) GROUP BY n");
+//        ResultSet rs = stmt.executeQuery("SELECT (number % 3 + 1) as n, sum(number) FROM numbers(10000000) GROUP BY n");
+
+        ResultSet rs = stmt.executeQuery("INSERT INTO alarm.ct_alarm_info VALUES ('3', 'xxx', 'indoor-002', 569, 'ssss', '2019-05-08 11:32:24');");
 
         while (rs.next()) {
             System.out.println(rs.getInt(1) + "\t" + rs.getLong(2));
