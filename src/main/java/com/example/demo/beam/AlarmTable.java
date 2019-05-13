@@ -1,8 +1,6 @@
 package com.example.demo.beam;
 
 
-import org.joda.time.DateTime;
-import org.joda.time.MutableDateTime;
 
 /**
  * Description：describe this class function
@@ -21,7 +19,7 @@ public class AlarmTable {
 
     private String alarmMsg;
 
-    private MutableDateTime alarmTime;
+    private String alarmTime;
 
 //    private String alarmTime = "未知";
 
@@ -65,11 +63,11 @@ public class AlarmTable {
         this.alarmMsg = alarmMsg;
     }
 
-    public MutableDateTime getAlarmTime() {
+    public String getAlarmTime() {
         return alarmTime;
     }
 
-    public void setAlarmTime(MutableDateTime alarmTime) {
+    public void setAlarmTime(String alarmTime) {
         this.alarmTime = alarmTime;
     }
 
