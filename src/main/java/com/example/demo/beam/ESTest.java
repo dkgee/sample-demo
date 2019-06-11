@@ -182,7 +182,9 @@ public class ESTest {
 
         Pipeline pipeline = Pipeline.create(options);
 
-        String textPath = "F:\\qmgz2019.txt";
+//        String textPath = "F:\\qmgz2019.txt";
+        String textPath = "F:\\ttt\\qmgz2019_0610\\qmgz2019_0610.txt";
+//        String textPath = "F:\\qmgz2019_0610.txt";
         PCollection<Qmgz> qmgzTablePCollection =pipeline.apply(TextIO.read().from(textPath))
                 .apply("ReverseToEntityObject", ParDo.of(new DoFn<String, Qmgz>() {
                     private static final long serialVersionUID = 1L;
