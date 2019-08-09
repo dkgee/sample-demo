@@ -69,7 +69,7 @@ public class SchController {
         TriggerKey triggerKey = TriggerKey.triggerKey(jobName, jobGroup);
         try {
             if (scheduler.checkExists(triggerKey)) {
-                scheduler.pauseTrigger(triggerKey);//新建任务
+                scheduler.pauseTrigger(triggerKey);//暂停任务
             }
         } catch (SchedulerException e) {
             e.printStackTrace();
