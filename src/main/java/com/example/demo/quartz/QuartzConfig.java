@@ -1,0 +1,32 @@
+package com.example.demo.quartz;
+
+import org.quartz.Scheduler;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.quartz.SchedulerFactoryBean;
+
+/**
+ * Description：describe this class function
+ * Author；JinHuatao
+ * Date: 2019/8/9 13:15
+ */
+@Configuration
+public class QuartzConfig {
+
+    @Autowired
+    private SpringJobFactory springJobFactory;
+
+    @Bean
+    public SchedulerFactoryBean schedulerFactoryBean() {
+        SchedulerFactoryBean schedulerFactoryBean = new SchedulerFactoryBean();
+//        schedulerFactoryBean.setJobFactory(springJobFactory);
+        return schedulerFactoryBean;
+    }
+
+    @Bean
+    public Scheduler scheduler() {
+        return schedulerFactoryBean().getScheduler();
+    }
+
+}
