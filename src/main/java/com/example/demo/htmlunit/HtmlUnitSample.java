@@ -76,11 +76,11 @@ public class HtmlUnitSample {
     public static void homePage_proxy(){
         String proxyhost = "127.0.0.1";
         int port = 1080;
-        try(final WebClient webClient = new WebClient(BrowserVersion.CHROME, proxyhost, port)) {
-            final HtmlPage page = webClient.getPage("https://www.baidu.com/");
+        try(final WebClient webClient = new WebClient(BrowserVersion.CHROME)) {
+            final HtmlPage page = webClient.getPage("https://github.com/hao369/a/wiki/jyg");
 //            Assert.assertEquals("Google", page.getTitleText());
-//            System.out.println("==================================================>" + page.asText());//获取网页字符串文本
-            System.out.println("==================================================>" + page.asXml());//获取网页内容XML文本
+            System.out.println("==================================================>" + page.asText());//获取网页字符串文本
+//            System.out.println("==================================================>" + page.asXml());//获取网页内容XML文本
         } catch (MalformedURLException e) {
             e.printStackTrace();
         } catch (IOException e) {
