@@ -1,5 +1,6 @@
 package com.example.demo.htmlunit;
 
+import com.example.demo.util.MD5Util;
 import com.example.demo.util.TextUtil;
 import org.apache.http.Header;
 import org.apache.http.HttpResponse;
@@ -57,12 +58,13 @@ public class HttpClientSample {
         //TODO step02: 响应头过滤对象
         System.out.println("=============响应头过滤对象处理=============");
         int statusCode = httpResponse.getStatusLine().getStatusCode();
-        System.out.println("StatusCode:" + statusCode);
-        System.out.println("=============协议过滤=============");
+        String reason = httpResponse.getStatusLine().getReasonPhrase();
+//        System.out.println("StatusCode:" + statusCode);
+//        System.out.println("=============协议过滤=============");
         String protocol = httpResponse.getStatusLine().getProtocolVersion().getProtocol();
         int protocolMajor = httpResponse.getStatusLine().getProtocolVersion().getMajor();
         int protocolMinor = httpResponse.getStatusLine().getProtocolVersion().getMinor();
-        System.out.println("Protocol:" + protocol + " " + protocolMajor + "." + protocolMinor);
+        System.out.println(protocol + "/" + protocolMajor + "." + protocolMinor + " " + statusCode + " "  + reason);
 
         System.out.println("=============Header过滤=============");
         Header[] headers = httpResponse.getAllHeaders();
@@ -105,12 +107,57 @@ public class HttpClientSample {
 
     }
 
+    public static byte[] sample02(String imageUrl) throws URISyntaxException, IOException {
+        RequestConfig requestConfig = RequestConfig.custom()
+                .setSocketTimeout(100000)
+                .setConnectTimeout(100000)
+                .setConnectionRequestTimeout(100000).setCookieSpec(CookieSpecs.IGNORE_COOKIES)
+                .build();
+
+        HttpGet get = initGetRequest(imageUrl);
+        get.setConfig(requestConfig);
+        CloseableHttpClient httpClient = HttpClients.createDefault();
+        HttpResponse httpResponse = httpClient.execute(get);
+        if(httpResponse.getStatusLine().getStatusCode() == HttpStatus.SC_OK){
+            String fileContentType = httpResponse.getEntity().getContentType().getValue();
+            if(fileContentType.contains("image")){
+                InputStream is = httpResponse.getEntity().getContent();
+                BufferedInputStream bis = new BufferedInputStream(is);
+                ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+                byte[] data = new byte[1024];
+                int current = 0;
+                int size = 0;
+                while((current = bis.read(data,0,data.length)) != -1){
+                    buffer.write(data,0,current);
+                    size += current;
+                }
+                return buffer.toByteArray();
+            }
+        }
+        return null;
+    }
+
     public static void main(String[] args) {
+//        try {
+//            String url = "http://www.ecer.com/";
+//            sample01(url);
+//        }catch (Exception e){
+//            e.printStackTrace();
+//        }
+
+//        String imageUrl = "https://avatar.csdnimg.cn/F/8/0/1_xiaoa_m.jpg";//652a8141d6d5c782f40344f4515ddeac
+        //"https://aea2.vcdfw.ga/?0f=K5nCNJ&ty6cfr=CUqHED7H&J9a=0xFR8q&27CxFL48_ii=XOCH&-d4R0t=lWWFBwIUU&kvEdbZU=u&_dxf=img";
+        String imageUrl = "https://avatar.csdnimg.cn/3/1/B/1_ycagri.jpg";//a4b8421a1bfffe731ef59ce5c83e9c56  a4b8421a1bfffe731ef59ce5c83e9c56
         try {
-            String url = "https://dc.geye8.gq/";
-            sample01(url);
-        }catch (Exception e){
+            byte[] bytes = sample02(imageUrl);
+            System.out.println(MD5Util.getFileMD5(bytes));
+        } catch (URISyntaxException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (Exception e) {
             e.printStackTrace();
         }
+
     }
 }
