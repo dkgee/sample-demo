@@ -2,6 +2,8 @@ package com.example.demo.htmlunit;
 
 import com.example.demo.util.MD5Util;
 import com.example.demo.util.TextUtil;
+import com.gargoylesoftware.htmlunit.util.EncodingSniffer;
+import com.gargoylesoftware.htmlunit.util.NameValuePair;
 import org.apache.http.Header;
 import org.apache.http.HttpResponse;
 import org.apache.http.HttpStatus;
@@ -17,6 +19,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.charset.Charset;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * Description：describe this class function
@@ -137,17 +143,41 @@ public class HttpClientSample {
         return null;
     }
 
+    public static void sample03(String url) throws URISyntaxException, IOException {
+        RequestConfig requestConfig = RequestConfig.custom()
+                .setSocketTimeout(100000)
+                .setConnectTimeout(100000)
+                .setConnectionRequestTimeout(100000).setCookieSpec(CookieSpecs.IGNORE_COOKIES)
+                .build();
+        HttpGet get = initGetRequest(url);
+        get.setConfig(requestConfig);
+        CloseableHttpClient httpClient = HttpClients.createDefault();
+        HttpResponse httpResponse = httpClient.execute(get);
+        if(httpResponse.getStatusLine().getStatusCode() == HttpStatus.SC_OK){
+            InputStream is = httpResponse.getEntity().getContent();
+            Header[] headers = httpResponse.getAllHeaders();
+            List<NameValuePair> headerList = new ArrayList<>();
+            for(Header header: headers) {
+                NameValuePair nameValuePair = new NameValuePair(header.getName(), header.getValue());
+                headerList.add(nameValuePair);
+            }
+            Charset charset = EncodingSniffer.sniffHtmlEncoding(headerList ,is);
+            System.out.println(charset.displayName());
+        }
+    }
+
     public static void main(String[] args) {
-//        try {
-//            String url = "http://www.ecer.com/";
-//            sample01(url);
-//        }catch (Exception e){
-//            e.printStackTrace();
-//        }
+        try {
+            //"https://dc.geye8.gq/"
+            String url = "https://dc.geye8.gq/";
+            sample03(url);
+        }catch (Exception e){
+            e.printStackTrace();
+        }
 
 //        String imageUrl = "https://avatar.csdnimg.cn/F/8/0/1_xiaoa_m.jpg";//652a8141d6d5c782f40344f4515ddeac
         //"https://aea2.vcdfw.ga/?0f=K5nCNJ&ty6cfr=CUqHED7H&J9a=0xFR8q&27CxFL48_ii=XOCH&-d4R0t=lWWFBwIUU&kvEdbZU=u&_dxf=img";
-        String imageUrl = "https://avatar.csdnimg.cn/3/1/B/1_ycagri.jpg";//a4b8421a1bfffe731ef59ce5c83e9c56  a4b8421a1bfffe731ef59ce5c83e9c56
+       /* String imageUrl = "https://avatar.csdnimg.cn/3/1/B/1_ycagri.jpg";//a4b8421a1bfffe731ef59ce5c83e9c56  a4b8421a1bfffe731ef59ce5c83e9c56
         try {
             byte[] bytes = sample02(imageUrl);
             System.out.println(MD5Util.getFileMD5(bytes));
@@ -157,7 +187,7 @@ public class HttpClientSample {
             e.printStackTrace();
         } catch (Exception e) {
             e.printStackTrace();
-        }
+        }*/
 
     }
 }
