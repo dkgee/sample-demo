@@ -303,14 +303,18 @@ public class HtmlUnitSample {
     }
 
     public static void sample04() {
-        String url = "https://blog.csdn.net/yanghaolong/article/details/86680282";
+//        String url = "https://blog.csdn.net/yanghaolong/article/details/86680282";
+//        String url = "https://github.com/hao369/a/wiki/jyg";
+//        String url = "http://1vxh93p.i78.integreat.com.mx/";
+        String url = "http://j7u.vtee.gq/t-22-12";
         try (final WebClient webClient = new WebClient()) {
             webClient.getOptions().setUseInsecureSSL(true);
             webClient.getOptions().setThrowExceptionOnScriptError(false);
             webClient.getOptions().setThrowExceptionOnFailingStatusCode(false);
             webClient.getOptions().setActiveXNative(false);
             webClient.getOptions().setCssEnabled(false);
-            webClient.getOptions().setJavaScriptEnabled(false);
+            webClient.getOptions().setJavaScriptEnabled(true);
+            webClient.getOptions().setRedirectEnabled(true);
             webClient.getOptions().setTimeout(30000);
             //添加请求头方式一
 //            webClient.addRequestHeader("", "");
@@ -371,14 +375,14 @@ public class HtmlUnitSample {
             System.out.println("============================【加载页面】====================================");
             Page page = webClient.getPageCreator().createPage(webResponse, webClient.getCurrentWindow());
             HtmlPage htmlPage = (HtmlPage) page;
-            String title = htmlPage.getTitleText();
-            HtmlHeading1 heading1 =  (HtmlHeading1) htmlPage.getByXPath("//*[@id=\"mainBox\"]/main/div[1]/div/div/div[1]/h1").get(0);
-            String articleTitle = heading1.asText();
-            HtmlSpan span = htmlPage.getFirstByXPath("//*[@id=\"mainBox\"]/main/div[1]/div/div/div[2]/div[1]/span[1]");
-            String postTime = span.asText();
-            System.out.println("#Title:" + title);
-            System.out.println("#ArticleTitle:" + articleTitle);
-            System.out.println("#PostTime:" + postTime);
+//            String title = htmlPage.getTitleText();
+//            HtmlHeading1 heading1 =  (HtmlHeading1) htmlPage.getByXPath("//*[@id=\"mainBox\"]/main/div[1]/div/div/div[1]/h1").get(0);
+//            String articleTitle = heading1.asText();
+//            HtmlSpan span = htmlPage.getFirstByXPath("//*[@id=\"mainBox\"]/main/div[1]/div/div/div[2]/div[1]/span[1]");
+//            String postTime = span.asText();
+//            System.out.println("#Title:" + title);
+//            System.out.println("#ArticleTitle:" + articleTitle);
+//            System.out.println("#PostTime:" + postTime);
             System.out.println("============================【页面css链接】====================================");
             Set<String> cssHref = new HashSet<>();
             DomNodeList<DomElement> pageAllCsslinks = htmlPage.getElementsByTagName("link");
@@ -395,7 +399,7 @@ public class HtmlUnitSample {
             Set<String> jsSrc = new HashSet<>();
             DomNodeList<DomElement> pageAllJslinks = htmlPage.getElementsByTagName("script");
             System.out.println(">>>>>>>>>>>>>>>>>>JS src:" + pageAllJslinks.size());
-            System.out.println("BaseUrl:" + htmlPage.getUrl());
+//            System.out.println("BaseUrl:" + htmlPage.getUrl());
             for(DomElement domElement: pageAllJslinks){
                 String text = domElement.getTextContent();
                 if(StringUtils.isBlank(text)){
@@ -475,7 +479,7 @@ public class HtmlUnitSample {
         } catch (Exception e) {
             e.printStackTrace();
         }*/
-        homePage_sample03("http://1ak2dji.k8u7.ko-kut.net/jt1/?id=2");
-//        sample04();
+//        homePage_sample03("http://1ak2dji.k8u7.ko-kut.net/jt1/?id=2");
+        sample04();
     }
 }
