@@ -1,7 +1,5 @@
 package com.example.demo.htmlunit;
 
-import com.example.demo.util.MD5Util;
-import com.example.demo.util.TextUtil;
 import com.gargoylesoftware.htmlunit.*;
 import com.gargoylesoftware.htmlunit.html.*;
 import com.gargoylesoftware.htmlunit.util.NameValuePair;
@@ -11,18 +9,10 @@ import org.apache.commons.lang3.StringUtils;
 import javax.imageio.ImageReader;
 import javax.swing.*;
 import java.awt.image.BufferedImage;
-import java.io.BufferedInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.net.URLDecoder;
-import java.net.URLEncoder;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Description：describe this class function
@@ -302,6 +292,52 @@ public class HtmlUnitSample {
         }
     }
 
+    public static void sample0301(){
+        String url = "https://blog.csdn.net/yanghaolong/article/details/86680282";
+        try (final WebClient webClient = new WebClient()) {
+            webClient.getOptions().setThrowExceptionOnScriptError(false);
+            webClient.getOptions().setThrowExceptionOnFailingStatusCode(false);
+            webClient.getOptions().setActiveXNative(false);
+            webClient.getOptions().setCssEnabled(false);
+            webClient.getOptions().setJavaScriptEnabled(true);
+            webClient.getOptions().setTimeout(30000);
+
+            String html = "<!DOCTYPE html PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\" >\n" +
+                    "<html>\n" +
+                    "\t<head>\n" +
+                    "\t\t<meta http-equiv=\"Content-Type\" content=\"text/html; charset=gb2312\" >\n" +
+                    "\t\t<meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">\n" +
+                    "\t\t<title>&#21160;&#24577;&#32593;</title>\n" +
+                    "\t</head>\n" +
+                    "<body>\n" +
+                    "</body></html>";
+
+            //step01: 获取网页字节码及请求状态码
+            byte[] body = html.getBytes();
+            int statusCode = 200;
+            String statusMessage = "success";
+            List<NameValuePair> responseHeaders = new ArrayList<>();
+            WebResponseData  webResponseData = new WebResponseData(body, statusCode,
+                    statusMessage, responseHeaders);
+
+            WebRequest webRequest = new WebRequest(new URL("https://we5.fdasre.tk/"));
+            WebResponse webResponse = new WebResponse(webResponseData, webRequest, 2000);
+
+            //step02: 加载至窗口执行
+            WebWindow webWindow = webClient.getCurrentWindow();
+            HtmlPage htmlPage = (HtmlPage)webClient.getPageCreator().createPage(webResponse, webWindow);
+
+            //step03: 获取网页标题
+            String title = htmlPage.getTitleText();
+
+            System.out.println(title);
+        } catch (MalformedURLException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
     public static void sample04() {
 //        String url = "https://blog.csdn.net/yanghaolong/article/details/86680282";
 //        String url = "https://github.com/hao369/a/wiki/jyg";
@@ -480,6 +516,7 @@ public class HtmlUnitSample {
             e.printStackTrace();
         }*/
 //        homePage_sample03("http://1ak2dji.k8u7.ko-kut.net/jt1/?id=2");
-        sample04();
+//        sample04();
+        sample0301();
     }
 }

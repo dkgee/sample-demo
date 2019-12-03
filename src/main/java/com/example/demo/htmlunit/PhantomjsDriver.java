@@ -14,6 +14,8 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Iterator;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 
@@ -43,16 +45,26 @@ public class PhantomjsDriver {
         //dcbs.setCapability("phantomjs.binary.path",  "");//驱动支持
         dcbs.setCapability("ignoreProtectedModeSettings", true);
         dcbs.setPlatform(Platform.VISTA);
-        dcbs.setCapability("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36");
+        dcbs.setCapability("phantomjs.page.settings.userAgent", "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36");
         dcbs.setBrowserName(BrowserType.CHROME);
-        String remoteHost = "http://172.30.154.245:8910";
+//        String remoteHost = "http://172.30.154.245:8910";
+        dcbs.setCapability("phantomjs.binary.path", "/usr/local/bin/phantomjs");
+        String remoteHost = "http://172.30.154.244:8910"; //8916会拒绝连接
         RemoteWebDriver driver = null;
         try {
             //step02: 创建远程web驱动连接
             driver = new RemoteWebDriver(new URL(remoteHost), dcbs);
 
-            String url = "https://passport.csdn.net/login?code=public";
+//            String url = "https://passport.csdn.net/login?code=public";
+            //打不开可能是已经被干掉了，不要一味以为是浏览器的原因。
+            String url = "http://qw2.zb76f.club/?kmI00MCL2=eC_YX&bmDYoAuy0=TF&dv1=RC_-zigGc&DsBZUlI=FYCRRVzGITC&x4XhaqXucc=2-Wn";
+//            String url = "http://www.baidu.com";
             driver.navigate().to(url);
+           /* Map cap = driver.getCapabilities().asMap();
+            Set<Map.Entry> ss = cap.entrySet();
+            for(Map.Entry entry: ss){
+                System.out.println(entry.getKey() + ":" + entry.getValue());
+            }*/
 
             //通过判断页面特定元素来是否存在来进行操作
 //            WebElement webElement = null;
@@ -68,27 +80,29 @@ public class PhantomjsDriver {
 
 //            driver.get(url);
             //driver.quit();//关闭session
-            String title = driver.getTitle();
-            System.out.println(title);
-            WebElement upBtn = null;
-            try {
-                upBtn = driver.findElementByXPath("//*[@id=\"app\"]/div/div/div[1]/div[2]/div[5]/ul/li[2]/a");
-            }catch (NoSuchElementException e){
-                System.out.println("upBtn不存在");
-                return;
-            }
-            if(upBtn != null)
-                upBtn.click();
-
-            WebElement username = driver.findElementByXPath("//*[@id=\"all\"]");//用户名
-            WebElement password = driver.findElementByXPath("//*[@id=\"password-number\"]");
-            WebElement loginBtn = driver.findElementByXPath("//*[@id=\"app\"]/div/div/div[1]/div[2]/div[5]/div/div[6]/div/button");
-            username.sendKeys("xxxxxxxxxxx@qq.com");
-            password.sendKeys("xxxxxxxxxx");
-            loginBtn.click();
-            TimeUnit.SECONDS.sleep(2);
+//            Thread.sleep(5000);
+//            String title = driver.getTitle();
             String html = driver.getPageSource();
-            System.out.println("========" + html);
+            System.out.println(html);
+//            WebElement upBtn = null;
+//            try {
+//                upBtn = driver.findElementByXPath("//*[@id=\"app\"]/div/div/div[1]/div[2]/div[5]/ul/li[2]/a");
+//            }catch (NoSuchElementException e){
+//                System.out.println("upBtn不存在");
+//                return;
+//            }
+//            if(upBtn != null)
+//                upBtn.click();
+//
+//            WebElement username = driver.findElementByXPath("//*[@id=\"all\"]");//用户名
+//            WebElement password = driver.findElementByXPath("//*[@id=\"password-number\"]");
+//            WebElement loginBtn = driver.findElementByXPath("//*[@id=\"app\"]/div/div/div[1]/div[2]/div[5]/div/div[6]/div/button");
+//            username.sendKeys("xxxxxxxxxxx@qq.com");
+//            password.sendKeys("xxxxxxxxxx");
+//            loginBtn.click();
+//            TimeUnit.SECONDS.sleep(2);
+//            String html = driver.getPageSource();
+//            System.out.println("========" + html);
 
 
 
@@ -139,8 +153,6 @@ public class PhantomjsDriver {
         } catch (MalformedURLException e) {
             e.printStackTrace();
         } catch (IOException e) {
-            e.printStackTrace();
-        } catch (InterruptedException e) {
             e.printStackTrace();
         } finally {
             if(driver != null){
