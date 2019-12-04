@@ -9,6 +9,7 @@ import org.apache.commons.lang3.StringUtils;
 import javax.imageio.ImageReader;
 import javax.swing.*;
 import java.awt.image.BufferedImage;
+import java.io.File;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -338,6 +339,27 @@ public class HtmlUnitSample {
         }
     }
 
+    public static void sample0302(){
+        String url = "https://blog.csdn.net/yanghaolong/article/details/86680282";
+        try (final WebClient webClient = new WebClient()) {
+            webClient.getOptions().setThrowExceptionOnScriptError(false);
+            webClient.getOptions().setThrowExceptionOnFailingStatusCode(false);
+            webClient.getOptions().setActiveXNative(false);
+            webClient.getOptions().setCssEnabled(false);
+            webClient.getOptions().setJavaScriptEnabled(true);
+            webClient.getOptions().setTimeout(30000);
+
+            HtmlPage page = webClient.getPage(url);
+            webClient.download(webClient.getCurrentWindow(), "blog",
+                    page.getWebResponse().getWebRequest(), false, false, null);
+            page.save(new File("D://load/ttt.txt"));
+        } catch (MalformedURLException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
     public static void sample04() {
 //        String url = "https://blog.csdn.net/yanghaolong/article/details/86680282";
 //        String url = "https://github.com/hao369/a/wiki/jyg";
@@ -517,6 +539,6 @@ public class HtmlUnitSample {
         }*/
 //        homePage_sample03("http://1ak2dji.k8u7.ko-kut.net/jt1/?id=2");
 //        sample04();
-        sample0301();
+        sample0302();
     }
 }
