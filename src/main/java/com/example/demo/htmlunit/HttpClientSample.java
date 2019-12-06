@@ -4,19 +4,17 @@ import com.example.demo.util.MD5Util;
 import com.example.demo.util.TextUtil;
 import com.gargoylesoftware.htmlunit.util.EncodingSniffer;
 import com.gargoylesoftware.htmlunit.util.NameValuePair;
-import org.apache.http.Header;
-import org.apache.http.HttpResponse;
-import org.apache.http.HttpStatus;
+import org.apache.commons.io.FileUtils;
+import org.apache.http.*;
 import org.apache.http.client.config.CookieSpecs;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.io.BufferedInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
@@ -30,6 +28,8 @@ import java.util.List;
  * Date: 2019/8/27 18:33
  */
 public class HttpClientSample {
+
+    private static Logger LOG = LoggerFactory.getLogger(HttpClientSample.class);
 
     public static HttpGet initGetRequest(String url) throws URISyntaxException {
         String tmpUrl = url.trim();
@@ -166,6 +166,88 @@ public class HttpClientSample {
         }
     }
 
+    private static void getFileStream(InputStream inputStream, File file, String filepath) throws IOException {
+        boolean newFile = file.createNewFile();
+        if(newFile){
+            FileUtils.copyInputStreamToFile(inputStream, file);
+        }
+    }
+
+    /**
+     * 根据url路径获取文件保存路径, 只获取文件，不下载文件
+     * */
+    public static String getFileSavePath(String url, String saveDir) {
+        String fileName = null;
+        try {
+            HttpHost httpHost = new HttpHost("127.0.0.1", 1080);
+            HttpGet get = initGetRequest(url);
+            RequestConfig requestConfig;
+            requestConfig = RequestConfig.custom()
+                    .setSocketTimeout(100000)
+                    .setConnectTimeout(100000)
+                    .setConnectionRequestTimeout(100000).setCookieSpec(CookieSpecs.IGNORE_COOKIES)
+                    .setProxy(httpHost)
+                    .build();
+            get.setConfig(requestConfig);
+            CloseableHttpClient httpClient = HttpClients.createDefault();
+            long stTime = System.currentTimeMillis();
+            HttpResponse httpResponse = httpClient.execute(get);
+            StatusLine statusLine = httpResponse.getStatusLine();
+            if (statusLine.getStatusCode() == 200) {
+                String fileContentType = httpResponse.getEntity().getContentType().getValue();
+                LOG.info("==========================" + fileContentType);
+                String tmpLastSuffix = "." + fileContentType.substring(fileContentType.indexOf("/") + 1);
+                if(tmpLastSuffix.contains(";")){
+                    tmpLastSuffix = tmpLastSuffix.substring(0, tmpLastSuffix.indexOf(";"));
+                }
+                //此处需要根据具体类型做判断
+                if(tmpLastSuffix.equals(".x-javascript") || tmpLastSuffix.equals(".javascript")){
+                    tmpLastSuffix = ".js";
+                }else if(tmpLastSuffix.equals(".plain")){
+                    tmpLastSuffix = ".txt";
+                }else if(tmpLastSuffix.equals(".octet-stream")){
+                    LOG.error("暂时不支持该请求内容类型");
+                    return null;
+                }
+
+                fileName = url.substring(url.lastIndexOf("/") + 1);
+                if(!fileName.contains(".")){
+                    fileName += tmpLastSuffix;
+                }
+                if(fileName.length() > 50 || fileName.contains("?") || fileName.contains("!") || fileName.contains("&")){
+                    String tmpFileName = fileName;
+                    fileName = System.currentTimeMillis() + tmpLastSuffix;
+                    LOG.warn(tmpFileName + "包含特殊字符或长度太长，采用系统自命名:" + fileName);
+                }
+                String fileSavePath = saveDir + fileName;
+                File file = new File(fileSavePath);
+                InputStream inputStream = httpResponse.getEntity().getContent();
+                long fileSize = httpResponse.getEntity().getContentLength();
+                try {
+                    if (file.exists()) {
+                        long tmpSize = file.length();
+                        if (fileSize != tmpSize) {
+                            getFileStream(inputStream, file, fileSavePath);
+                        }
+                    } else {
+                        getFileStream(inputStream, file, fileSavePath);
+                    }
+                } catch (Exception e) {
+                    LOG.info("文件写入异常" + statusLine.getStatusCode());
+                } finally {
+                    inputStream.close();
+                }
+                long edTime = System.currentTimeMillis();
+                LOG.info("下载耗时：" + (edTime - stTime) + "ms");
+            } else {
+                LOG.info("下载失败！下载结果码:" + statusLine.getStatusCode());
+            }
+        } catch (Exception e) {
+            LOG.error("下载失败," + e);
+        }
+        return fileName;
+    }
+
     public static void main(String[] args) {
         try {
             //"https://dc.geye8.gq/"
@@ -177,8 +259,10 @@ public class HttpClientSample {
 
 //        String imageUrl = "https://avatar.csdnimg.cn/F/8/0/1_xiaoa_m.jpg";//652a8141d6d5c782f40344f4515ddeac
         //"https://aea2.vcdfw.ga/?0f=K5nCNJ&ty6cfr=CUqHED7H&J9a=0xFR8q&27CxFL48_ii=XOCH&-d4R0t=lWWFBwIUU&kvEdbZU=u&_dxf=img";
-       /* String imageUrl = "https://avatar.csdnimg.cn/3/1/B/1_ycagri.jpg";//a4b8421a1bfffe731ef59ce5c83e9c56  a4b8421a1bfffe731ef59ce5c83e9c56
-        try {
+//        String imageUrl = "https://avatar.csdnimg.cn/3/1/B/1_ycagri.jpg";//a4b8421a1bfffe731ef59ce5c83e9c56  a4b8421a1bfffe731ef59ce5c83e9c56
+        String imageUrl = "https://waiguo99a.herokuapp.com/?RqpLndCO=haAQ&cm=232K1J&T2Ov52spz=zWnAUIw&uqY=gCAmNcCOG55&3VK5FM2zzeX=ws&Ve5=5z&6&_cxw=img";
+        String savePath = "/jxwz/";
+        /*try {
             byte[] bytes = sample02(imageUrl);
             System.out.println(MD5Util.getFileMD5(bytes));
         } catch (URISyntaxException e) {
@@ -188,6 +272,8 @@ public class HttpClientSample {
         } catch (Exception e) {
             e.printStackTrace();
         }*/
+
+        getFileSavePath(imageUrl, savePath);
 
     }
 }

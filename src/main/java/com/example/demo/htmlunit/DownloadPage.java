@@ -1,6 +1,10 @@
 package com.example.demo.htmlunit;
 
+import com.gargoylesoftware.htmlunit.*;
+import com.gargoylesoftware.htmlunit.html.HtmlPage;
+import com.gargoylesoftware.htmlunit.util.Cookie;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
 import org.apache.http.StatusLine;
@@ -9,18 +13,18 @@ import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.*;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.PrintWriter;
+import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.net.URL;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -53,28 +57,6 @@ import java.util.regex.Pattern;
 public class DownloadPage {
 
     private static Logger LOG = LoggerFactory.getLogger(DownloadPage.class);
-
-    private static String TAG_LINK_REG = "(<link[\\s]+\\w+[^>]+>)";
-
-//    private static String TAG_SCRIPT_REG = "(<script[\\s]+\\w+[^>]+\\.js[\\s]{0,1}\"[\\s]{0,1}>)";
-
-    private static String TAG_SCRIPT_REG = "(<script[\\s]+\\w+[^>]+>)";
-
-    private static String TAG_IMG_REG = "(<img[\\s]+\\w+[^>]+>)";
-
-//    private static String ATTR_HREF_INNER_REG = "(href=([\\w|.|/]+)[\\s]{0,1})";//？
-
-    private static String ATTR_HREF_OUTER_REG = "(href=[\\s]{0,1}\"(.+?)\")";
-
-    private static String ATTR_SRC_REG = "(src=[\\s]{0,1}\"(.+?)\")";
-
-    private static String ATTR_DATA_SRC_REG = "(data-src=[\\s]{0,1}\"(.+?)\")";
-
-//    private static String MAIN_DIR = "D:/snapshot/pptang.com/";
-    private static String MAIN_DIR = "D:/snapshot/";
-    private static String RESOURCE_CSS_DIR = "resources/css/";
-    private static String RESOURCE_JS_DIR = "resources/js/";
-    private static String RESOURCE_IMG_DIR = "resources/img/";
 
     /**
      * 通用正则匹配
@@ -115,7 +97,37 @@ public class DownloadPage {
         return falg;
     }
 
-    public static HttpGet initGetRequest(String url) throws URISyntaxException {
+    /**
+     * 将网页中的URL中包含在正则表达式中的字符处理成正常字符
+     * */
+    public static String replaceUrlRegex(final String url){
+        StringBuilder sb = new StringBuilder(url);
+        if(url.contains("?")){
+            String tmpUrl = url;
+            sb  = new StringBuilder();
+            String[] tt = tmpUrl.split("\\?");
+            for(int i = 0; i < tt.length; i++){
+                sb.append(tt[i]);
+                if(i != tt.length - 1){
+                    sb.append("\\?");
+                }
+            }
+        }
+        if(url.contains(".")){
+            String tmpUrl = sb.toString();
+            sb  = new StringBuilder();
+            String[] tt = tmpUrl.split("\\.");
+            for(int i = 0; i < tt.length; i++){
+                sb.append(tt[i]);
+                if(i != tt.length - 1){
+                    sb.append("\\.");
+                }
+            }
+        }
+        return sb.toString();
+    }
+
+    public static HttpGet initGetRequest(PageContext pageContext, String url) throws URISyntaxException {
         String tmpUrl = url.trim();
         URI uri = new URI(tmpUrl);
         HttpGet get = new HttpGet(uri);
@@ -127,6 +139,7 @@ public class DownloadPage {
         get.setHeader("Pragma", "no-cache");
         get.setHeader("Upgrade-Insecure-Requests", "1");
         get.setHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.110 Safari/537.36");
+        get.setHeader("Referer", pageContext.getReferer());
         return get;
     }
 
@@ -140,17 +153,17 @@ public class DownloadPage {
     /**
      * 根据url路径获取文件保存路径, 只获取文件，不下载文件
      * */
-    public static String getFileSavePath(String url, String saveDir) {
+    public static String getFileSavePath(PageContext pageContext, String url, String saveDir) {
         String fileName = null;
         try {
-//            HttpHost httpHost = new HttpHost("127.0.0.1", 1080);
-            HttpGet get = initGetRequest(url);
+            HttpHost httpHost = new HttpHost("127.0.0.1", 1080);
+            HttpGet get = initGetRequest(pageContext, url);
             RequestConfig requestConfig;
             requestConfig = RequestConfig.custom()
                     .setSocketTimeout(100000)
                     .setConnectTimeout(100000)
                     .setConnectionRequestTimeout(100000).setCookieSpec(CookieSpecs.IGNORE_COOKIES)
-//                    .setProxy(httpHost)
+                    .setProxy(httpHost)
                     .build();
             get.setConfig(requestConfig);
             CloseableHttpClient httpClient = HttpClients.createDefault();
@@ -160,14 +173,18 @@ public class DownloadPage {
             if (statusLine.getStatusCode() == 200) {
                 String fileContentType = httpResponse.getEntity().getContentType().getValue();
                 LOG.info("==========================" + fileContentType);
-                String tmpLastSuffix = "";
-                if(fileContentType.contains("image")){
-                    tmpLastSuffix = ".png";
-                    if(fileContentType.contains("/")){
-                        tmpLastSuffix = "." + fileContentType.substring(fileContentType.indexOf("/") + 1);
-                    }
-                }else if(fileContentType.contains("android")){
-                    tmpLastSuffix = ".apk";
+                String tmpLastSuffix = "." + fileContentType.substring(fileContentType.indexOf("/") + 1);
+                if(tmpLastSuffix.contains(";")){
+                    tmpLastSuffix = tmpLastSuffix.substring(0, tmpLastSuffix.indexOf(";"));
+                }
+                //此处需要根据具体类型做判断
+                if(tmpLastSuffix.equals(".x-javascript") || tmpLastSuffix.equals(".javascript")){
+                    tmpLastSuffix = ".js";
+                }else if(tmpLastSuffix.equals(".plain")){
+                    tmpLastSuffix = ".txt";
+                }else if(tmpLastSuffix.equals(".octet-stream")){
+                    LOG.error("暂时不支持该请求内容类型");
+                    return null;
                 }
 
                 fileName = url.substring(url.lastIndexOf("/") + 1);
@@ -176,21 +193,7 @@ public class DownloadPage {
                 }
                 if(fileName.length() > 50 || fileName.contains("?") || fileName.contains("!") || fileName.contains("&")){
                     String tmpFileName = fileName;
-                    fileName = System.currentTimeMillis() + "";
-                    if(tmpFileName.contains(".")){
-                        int index = tmpFileName.lastIndexOf(".");
-                        if(tmpFileName.contains("?")){
-                            int lastindex = tmpFileName.indexOf("?");
-                            if(index < lastindex){
-                                tmpLastSuffix = tmpFileName.substring(index,lastindex);
-                            }else{
-                                tmpLastSuffix = tmpFileName.substring(index);
-                            }
-                        }else{
-                            tmpLastSuffix = tmpFileName.substring(index);
-                        }
-                    }
-                    fileName += tmpLastSuffix;
+                    fileName = System.currentTimeMillis() + tmpLastSuffix;
                     LOG.warn(tmpFileName + "包含特殊字符或长度太长，采用系统自命名:" + fileName);
                 }
                 String fileSavePath = saveDir + fileName;
@@ -222,6 +225,50 @@ public class DownloadPage {
         return fileName;
     }
 
+    public static void getHtmlByHtmlUnit(PageContext pageContext) {
+        String proxyhost = "127.0.0.1";
+        int port = 1080;
+        try (final WebClient webClient = new WebClient(BrowserVersion.CHROME, proxyhost, port)) {
+            webClient.getOptions().setUseInsecureSSL(true);
+            webClient.getOptions().setCssEnabled(true);
+            webClient.getOptions().setJavaScriptEnabled(true);
+            webClient.setAjaxController(new NicelyResynchronizingAjaxController());//很重要，设置支持AJAX
+            webClient.getOptions().setRedirectEnabled(true);
+            webClient.getOptions().setThrowExceptionOnScriptError(false);
+            webClient.getOptions().setThrowExceptionOnFailingStatusCode(false);
+            webClient.getOptions().setActiveXNative(false);
+            webClient.getOptions().setTimeout(20000);//设置“浏览器”的请求超时时间
+            webClient.setJavaScriptTimeout(20000);//设置JS执行的超时时间
+            webClient.getOptions().setThrowExceptionOnScriptError(false);//屏蔽日志
+            webClient.getOptions().setThrowExceptionOnFailingStatusCode(false);//屏蔽日志
+
+            URL myUrl = new URL(pageContext.getRequestUrl());
+            WebRequest wr = new WebRequest(myUrl);
+            wr.setAdditionalHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8");
+            wr.setAdditionalHeader("Accept-Encoding", "gzip, deflate, sdch");
+            wr.setAdditionalHeader("Accept-Language", "zh-CN,zh;q=0.8,en-US;q=0.6,en;q=0.4");
+            wr.setAdditionalHeader("Cache-Control", "no-cache");
+            wr.setAdditionalHeader("Connection", "keep-alive");
+            wr.setAdditionalHeader("Pragma", "no-cache");
+            wr.setAdditionalHeader("Upgrade-Insecure-Requests", "1");
+            wr.setAdditionalHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.110 Safari/537.36");
+
+            webClient.waitForBackgroundJavaScript(20000);//该方法阻塞线程
+
+            WebResponse webResponse = webClient.loadWebResponse(wr);
+            Page page = webClient.getPageCreator().createPage(webResponse, webClient.getCurrentWindow());
+            HtmlPage htmlPage = (HtmlPage) page;
+
+            Set<Cookie> ss = webClient.getCookies(myUrl);
+            pageContext.setCookieSet(webClient.getCookies(myUrl));
+            pageContext.setHtml(htmlPage.asXml());
+        } catch (MalformedURLException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
     public static void test01() throws IOException {
 //        String file = "D:\\snapshot\\baidu.com\\index.html";
 //        String mainUrl = "https://www.baidu.com/";
@@ -229,103 +276,172 @@ public class DownloadPage {
 //        Document document = Jsoup.parse(new File(file), "utf-8");
 //        String html = document.html();
 
-        String mainUrl =  "https://www.csdn.net/";
-        String mainUrl_Sep =  "https://www.csdn.net";
-        String mainProtocolHead = "https:";
-        String Domain = "csdn.net";
+//        String mainUrl =  "https://www.csdn.net/";
+//        String mainUrl_Sep =  "https://www.csdn.net";
+//        String mainProtocolHead = "https:";
+//        String Domain = "csdn.net";
 
-     /*   String mainUrl =  "https://www.baidu.com/";
-        String mainProtocolHead = "https:";
-        String Domain = "baidu.com";*/
+//        String mainUrl =  "https://cn.bing.com/";
+//        String mainUrl_Sep =  "https://cn.bing.com";
+//        String mainProtocolHead = "https:";
+//        String Domain = "cn.bing.com";
 
-        Document document = Jsoup.connect(mainUrl).get();
-        String html = document.html();
+        //TODO 置一个上下文对象，记录响应的Cookie、Referer等信息
+
+//        String mainUrl =  "https://www.baidu.com/";
+//        String mainUrl_Sep =  "https://www.baidu.com";
+//        String mainProtocolHead = "https:";
+//        String Domain = "baidu.com";
+
+        String mainUrl =  "https://waiguo99a.herokuapp.com/?ZkpKcvCL=mfKc&_5wbwQXmWs=F8EnvpETnxz&zFRh=Rm9zXuy&yLHO9BmFCQO=uVNR1uq&nyML_=Hq";
+        String mainUrl_Sep =  "https://waiguo99a.herokuapp.com";
+        String mainProtocolHead = "https:";
+        String domain = "waiguo99a.herokuapp.com";
+        PageContext pageContext = new PageContext();
+        pageContext.setRequestUrl(mainUrl);
+        pageContext.setDomain(domain);
+        pageContext.setRequestHost(mainUrl_Sep);
+        pageContext.setProtocolHead(mainProtocolHead);
+        pageContext.setReferer(mainUrl);
+
+        //TODO 使用HtmlUnit拿主网页(复杂网页还是下载不了)
+//        Document document = Jsoup.connect(mainUrl).get();
+//        String html = document.html();
+
+        getHtmlByHtmlUnit(pageContext);
 
         System.out.println("======================================");
         System.out.println("创建保存目录");
         //根据域名创建目录
-//        String mainDir = MAIN_DIR;
-        String mainDir = MAIN_DIR + Domain + "/";
-        String cssDir = mainDir + RESOURCE_CSS_DIR;
-        String jsDir = mainDir + RESOURCE_JS_DIR;
-        String imgDir = mainDir + RESOURCE_IMG_DIR;
+        String mainDir = PageConfig.MAIN_DIR + pageContext.getDomain() + "/";
+        String cssDir = mainDir + PageConfig.RESOURCE_CSS_DIR;
+        String jsDir = mainDir + PageConfig.RESOURCE_JS_DIR;
+        String imgDir = mainDir + PageConfig.RESOURCE_IMG_DIR;
+        pageContext.setMainDir(mainDir);
+        pageContext.setCssDir(cssDir);
+        pageContext.setJsDir(jsDir);
+        pageContext.setImgDir(imgDir);
+
         mkDir(mainDir);
         System.out.println("主目录:" + mainDir);
         //下载html文件，缓存本地
+        String mif = mainDir + PageConfig.INDEX_HTML;
+        if(pageContext.getHtml() != null){
+            PrintWriter pw = new PrintWriter(new File(mif));
+            pw.write(pageContext.getHtml());
+            pw.flush();
+            pw.close();
+        }else {
+            return;
+        }
 
+
+        //TODO 提取的链接有问题，不是CSS的文件太多（必须以.css结尾）
         mkDir(cssDir);
         System.out.println("css目录:" + cssDir);
         //下载css文件，写入该目录
         System.out.println("======================================");
         System.out.println("===============提取所有的其他(css等)下载链接===============");
-        List<String> linkTag = commonReg(html, TAG_LINK_REG, 0);
+        List<String> linkTag = commonReg(pageContext.getHtml(), PageConfig.TAG_LINK_REG, 0);
         StringBuilder linkText = new StringBuilder();
         for(String link:linkTag){
             linkText.append(link);
             linkText.append("\n\r");
         }
         String link = linkText.toString();
-        List<String> linkOuterHref = commonReg(link, ATTR_HREF_OUTER_REG, 2);
+        List<String> linkOuterHref = commonReg(link, PageConfig.ATTR_HREF_OUTER_REG, 2);
         Set<String> linkHref = new HashSet<>();
         linkHref.addAll(linkOuterHref);
         System.out.println("需要下载其他文件数量【包含//开头的链接】：" + linkHref.size());
         for(String href:linkHref){
             String tmpUrl = href;
 //            System.out.println(tmpUrl);
+            if(href == null){
+                System.out.println("CSS链接为空");
+                continue;
+            }
             if(href.startsWith("//")){
                 tmpUrl = mainProtocolHead + href;
             }else if(href.startsWith("/")){
                 tmpUrl = mainUrl_Sep + href;
             }
-            String fileName = getFileSavePath(tmpUrl, cssDir);
-            String newHref = RESOURCE_CSS_DIR + fileName;
-            html = html.replaceAll(href, newHref);
+            if(tmpUrl.contains("&amp;")){
+                tmpUrl = tmpUrl.replaceAll("&amp;", "&");
+            }
+            //检查css中是否有url，如果有，需要提取下载，更换url。
+            String fileName = getFileSavePath(pageContext, tmpUrl, cssDir);
+
+            if(StringUtils.isNotBlank(fileName) && fileName.endsWith(".css")){
+                String fileSavePath = cssDir + fileName;
+                replaceCssFile(pageContext, fileSavePath);
+            }
+
+            if(StringUtils.isNotBlank(fileName)){
+                String newHref = PageConfig.RESOURCE_CSS_DIR + fileName;
+                String regexHref = replaceUrlRegex(href);
+                String html = pageContext.getHtml().replaceAll(regexHref, newHref);
+                pageContext.setHtml(html);
+            }else {
+                LOG.warn("{} 未下载成功", href);
+            }
         }
 
 
         mkDir(jsDir);
         System.out.println("js目录:" + jsDir);
         //下载js文件，写入该目录
-        List<String> scriptTag = commonReg(html, TAG_SCRIPT_REG, 0);
+        List<String> scriptTag = commonReg(pageContext.getHtml(), PageConfig.TAG_SCRIPT_REG, 0);
         StringBuilder scriptText = new StringBuilder();
         for(String jsLink:scriptTag){
             scriptText.append(jsLink);
             scriptText.append("\n\r");
         }
         String script = scriptText.toString();
-        List<String> scriptSrc = commonReg(script, ATTR_SRC_REG, 2);
-        List<String> scriptDataSrc = commonReg(script, ATTR_DATA_SRC_REG, 2);
+        List<String> scriptSrc = commonReg(script, PageConfig.ATTR_SRC_REG, 2);
+        List<String> scriptDataSrc = commonReg(script, PageConfig.ATTR_DATA_SRC_REG, 2);
         Set<String> scriptHref = new HashSet<>();
         scriptHref.addAll(scriptSrc);
         scriptHref.addAll(scriptDataSrc);
         System.out.println("需要下载JS文件数量：" + scriptHref.size());
         for(String jsLink:scriptHref){
             String tmpUrl = jsLink;
-            System.out.println(tmpUrl);
+//            System.out.println(tmpUrl);
+            if(jsLink == null){
+                System.out.println("JS链接为空");
+                continue;
+            }
             if(jsLink.startsWith("//")){
                 tmpUrl = mainProtocolHead + jsLink;
             }else if(jsLink.startsWith("/")){
                 tmpUrl = mainUrl_Sep + jsLink;
             }
-            String fileName = getFileSavePath(tmpUrl, jsDir);
-            String newHref = RESOURCE_JS_DIR + fileName;
-            //TODO 此处路径替换有问题(每个都应该被替换掉)
-            html = html.replaceAll(jsLink, newHref);
+            if(tmpUrl.contains("&amp;")){
+                tmpUrl = tmpUrl.replaceAll("&amp;", "&");
+            }
+            String fileName = getFileSavePath(pageContext, tmpUrl, jsDir);
+            if(StringUtils.isNotBlank(fileName)){
+                String newHref = PageConfig.RESOURCE_JS_DIR + fileName;
+                String regexHref = replaceUrlRegex(jsLink);
+                String html = pageContext.getHtml().replaceAll(regexHref, newHref);
+                pageContext.setHtml(html);
+            }else {
+                LOG.warn("{} 未下载成功", jsLink);
+            }
         }
 
         mkDir(imgDir);
         System.out.println("img目录:" + imgDir);
         //下载img文件，写入该目录
         System.out.println("===============提取所有的Img下载链接===============");
-        List<String> imgTag = commonReg(html, TAG_IMG_REG, 0);
+        List<String> imgTag = commonReg(pageContext.getHtml(), PageConfig.TAG_IMG_REG, 0);
         StringBuilder imgText = new StringBuilder();
         for(String imgLink:imgTag){
             imgText.append(imgLink);
             imgText.append("\n\r");
         }
         String img = imgText.toString();
-        List<String> imgSrc = commonReg(img, ATTR_SRC_REG, 2);
-        List<String> imgDataSrc = commonReg(img, ATTR_DATA_SRC_REG, 2);
+        List<String> imgSrc = commonReg(img, PageConfig.ATTR_SRC_REG, 2);
+        List<String> imgDataSrc = commonReg(img, PageConfig.ATTR_DATA_SRC_REG, 2);
         Set<String> imgHref = new HashSet<>();
         imgHref.addAll(imgSrc);
         imgHref.addAll(imgDataSrc);
@@ -333,25 +449,75 @@ public class DownloadPage {
         for(String imgLink:imgHref){
             String tmpUrl = imgLink;
 //            System.out.println(tmpUrl);
+            if(imgLink == null){
+                System.out.println("图片链接为空");
+                continue;
+            }
             if(imgLink.startsWith("//")){
                 tmpUrl = mainProtocolHead + imgLink;
             }else if(imgLink.startsWith("/")){
                 tmpUrl = mainUrl_Sep + imgLink;
             }
-            String fileName = getFileSavePath(tmpUrl, imgDir);
-            String newHref = RESOURCE_IMG_DIR + fileName;
-            html = html.replaceAll(imgLink, newHref);
+            if(tmpUrl.contains("&amp;")){
+                tmpUrl = tmpUrl.replaceAll("&amp;", "&");
+            }
+            String fileName = getFileSavePath(pageContext, tmpUrl, imgDir);
+            if(StringUtils.isNotBlank(fileName)){
+                String newHref = PageConfig.RESOURCE_IMG_DIR + fileName;
+                String regexHref = replaceUrlRegex(imgLink);
+                String html = pageContext.getHtml().replaceAll(regexHref, newHref);
+                pageContext.setHtml(html);
+            }else {
+                LOG.warn("{} 未下载成功", imgLink);
+            }
         }
 
         //将本地缓存的html写入主目录 index.html
         String mainIndexFile = mainDir + "index.html";
         PrintWriter printWriter = new PrintWriter(new File(mainIndexFile));
-        printWriter.write(html);
+        printWriter.write(pageContext.getHtml());
         printWriter.flush();
         printWriter.close();
         System.out.println("======================================");
     }
 
+    public static void replaceCssFile(PageContext pageContext, String cssFilePath){
+        try {
+            String css = FileUtils.readFileToString(new File(cssFilePath), "utf-8");
+            List<String> cssUrlList = commonReg(css, PageConfig.CSS_FILE_URL_REG, 1);
+            System.out.println("CSS 文件中URL数量：" + cssUrlList.size());
+            if(!cssUrlList.isEmpty()){
+                for(String cssUrl:cssUrlList){
+                    String tmpUrl = cssUrl;
+                    if(cssUrl == null){
+                        System.out.println("css中URL链接为空");
+                        continue;
+                    }
+                    if(cssUrl.startsWith("/")){
+                        tmpUrl = pageContext.getRequestHost() + tmpUrl;
+                    }
+                    if(tmpUrl.contains("&amp;")){
+                        tmpUrl = tmpUrl.replaceAll("&amp;", "&");
+                    }
+                    String fileName = getFileSavePath(pageContext, tmpUrl, pageContext.getImgDir());
+                    if(StringUtils.isNotBlank(fileName)){
+                        String newHref = PageConfig.RESOURCE_IMG_DIR + fileName;
+                        newHref = newHref.replaceAll(PageConfig.RESOURCE, PageConfig.DOUBLE_DOT);//相对路径
+                        String regexHref = replaceUrlRegex(cssUrl);
+                        css = css.replaceAll(regexHref, newHref);
+                        PrintWriter printWriter = new PrintWriter(new File(cssFilePath));
+                        printWriter.write(css);
+                        printWriter.flush();
+                        printWriter.close();
+                    }else {
+                        LOG.warn("{} 未下载成功", cssUrl);
+                    }
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 
 
 
@@ -363,18 +529,32 @@ public class DownloadPage {
             e.printStackTrace();
         }
 
-//        String cssDir = "D:/snapshot/pptang.com/resources/js/";
-//        String tmpUrl = "https://dss0.bdstatic.com/5aV1bjqh_Q23odCf/static/superman/js/lib/jquery-1.10.2_1c4228b8.js";
+      /*  File file = new File("E:\\snapshot\\waiguo99a.herokuapp.com\\resources\\css\\1575538308176.css");
+        try {
+            String css = FileUtils.readFileToString(file, "utf-8");
+            List<String> ll = commonReg(css, PageConfig.CSS_FILE_URL_REG, 1);
+            for(String st: ll){
+                System.out.println(st);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }*/
+
+
+        /*String fileContentType = "application/x-javascript";
+        String tmpLastSuffix = "." + fileContentType.substring(fileContentType.indexOf("/") + 1);
+        if(tmpLastSuffix.contains(";")){
+            tmpLastSuffix = tmpLastSuffix.substring(0, tmpLastSuffix.indexOf(";"));
+        }
+        System.out.println(tmpLastSuffix);*/
+
+//        String cssDir = "D:/snapshot/";
+//        String tmpUrl = "https://cn.bing.com/th?id=OHR.CanadaTreeFarm_ZH-CN6478268657_1920x1080.jpg&amp;rf=LaDigue_1920x1080.jpg&amp;pid=hp";
 //        String fileName = getFileSavePath(tmpUrl, cssDir);
 //        System.out.println(fileName);
+        //下载没问题
+        //TODO 替换
+        // /rs/2T/kv/cj,nj/b2a824f7/b8c6c09d.js
+
     }
-
-
-
-
-
-
-
-
-
 }
