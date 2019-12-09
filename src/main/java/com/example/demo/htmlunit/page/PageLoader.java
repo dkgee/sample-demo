@@ -6,6 +6,10 @@ import com.example.demo.htmlunit.page.entity.*;
 import com.gargoylesoftware.htmlunit.*;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.gargoylesoftware.htmlunit.util.Cookie;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.http.client.HttpClient;
+import org.apache.http.impl.client.HttpClients;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.io.File;
@@ -15,10 +19,7 @@ import java.io.PrintWriter;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Future;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 /**
  * Description：describe this class function
@@ -54,7 +55,7 @@ public class PageLoader extends Thread{
     @Override
     public void run() {
         //step01: 创建页面下载线程池
-        ThreadPoolTaskExecutor threadPoolTaskExecutor = getThreadPoolExecutor();
+//        ThreadPoolTaskExecutor threadPoolTaskExecutor = getThreadPoolExecutor();
 
         //step02: 构建下载上线文
         LoaderContext loaderContext = new LoaderContext();
@@ -64,32 +65,51 @@ public class PageLoader extends Thread{
 
         getHtmlByHtmlUnit(seed, loaderContext);
 
-        if(loaderContext.getHtml() != null){
-           printIndexHtml(seed, loaderContext);
+        //写入本地文件
+        if(seed.getHtml() != null){
+            writeTextFile(seed.getSeedIndexPath(), seed.getHtml());
         }else {
             return;
         }
 
-        List<Curi> curiList = new ArrayList<>();
-
-        List<Curi> linkList = getHtmlLinkTag(seed, loaderContext);
-        List<Curi> scriptList = getHtmlScriptTag(seed, loaderContext);
-        List<Curi> imgList = getHtmlImgTag(seed, loaderContext);
-        curiList.addAll(linkList);
-        curiList.addAll(scriptList);
-        curiList.addAll(imgList);
+        //构造Http客户端
+        HttpClient client = HttpClients.createDefault();
 
         //step03: 提交下载资源
-        //多线程下载，需要控制下载速度
-        for(Curi curi: curiList){
-            Future<LoaderResult> future = threadPoolTaskExecutor.submit(new ResourceLoader(curi, loaderContext));
-            checkFinish.put(curi.getUrl(), future);
-        }
+        //此处使用异步加载机制，各下各的，分阶段下载，防止SSL堵塞资源状况
+        List<Curi> linkList = getHtmlLinkTag(seed);
+        downloadResource(linkList, loaderContext, client);//此处未下载css
+
+        List<Curi> scriptList = getHtmlScriptTag(seed);
+        downloadResource(scriptList, loaderContext, client);
+
+        List<Curi> imgList = getHtmlImgTag(seed);
+        downloadResource(imgList, loaderContext, client);
 
         while (true) {
             //检查资源是否下载完成
             checkFinish.entrySet().forEach((entry)->{
                 if(entry.getValue().isDone()){
+                    //下载完成css文件后，加上文件判断，必须为文本文件（例如 html、css、js）
+                    try {
+                        LoaderResult loaderResult = entry.getValue().get();
+                        if(loaderResult.isResult()){
+                            Curi cssCuri = entry.getValue().get().getCuri();
+                            if(cssCuri.getContextType() == ContextType.css){
+                                List<Curi> cssUrlList = getCssFileUrl(seed, cssCuri);
+                                if(cssUrlList != null && !cssUrlList.isEmpty()){
+                                    int cssSize = seed.getCssCount() + cssUrlList.size();
+                                    seed.setCssCount(cssSize);
+                                    downloadResource(cssUrlList, loaderContext, client);
+                                }
+                            }
+                        }
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    } catch (ExecutionException e) {
+                        e.printStackTrace();
+                    }
+                    //清理URL
                     String tmpUrl = entry.getKey();
                     if(checkFinish.containsKey(tmpUrl)){
                         if(!checkFinish.get(tmpUrl).isDone()){
@@ -110,7 +130,6 @@ public class PageLoader extends Thread{
                 System.out.println("===================IMG============================");
                 printExtractLink(imgList);
                 System.out.println("===============================================");
-                System.out.println(seed.getUrl() + ",资源下载完毕");
                 break;
             }else {
                 try {
@@ -120,26 +139,27 @@ public class PageLoader extends Thread{
                 }
             }
         }
-
-        System.out.println(seed.getUrl() + ",开始处理index.html。");
-        Map<String, String> indexHtmlRegexReplace = loaderContext.getIndexHtmlRegexReplace();
-        String html = loaderContext.getHtml();
-        for(Map.Entry<String, String> entry: indexHtmlRegexReplace.entrySet()){
-            String regexHref = entry.getKey();
-            String newHref = entry.getValue();
-            html = html.replaceAll(regexHref, newHref); //TODO 此处需要优化
-        }
-        loaderContext.setHtml(html);
-        printIndexHtml(seed, loaderContext);
-        System.out.println(seed.getUrl() + ",下载完成,关闭线程池");
-        threadPoolTaskExecutor.shutdown();
+        //主页内容替换
+        System.out.println(seed.getUrl() + ",资源下载完毕,开始处理文本文件，替换其中的链接路径");
+        replaceTextFile(loaderContext.getRegexReplaceFile());
+        System.out.println(seed.getUrl() + ",下载完成");
     }
 
+    //TODO 采集完成后线程不立即结束
     public static void main(String[] args) throws FileNotFoundException {
-        String url =  "https://waiguo99a.herokuapp.com/?ZkpKcvCL=mfKc&_5wbwQXmWs=F8EnvpETnxz&zFRh=Rm9zXuy&yLHO9BmFCQO=uVNR1uq&nyML_=Hq";
+//        String url =  "https://waiguo99a.herokuapp.com/?cWAClgCLs=mn7Ckz5&cKMO_=43rERWs&vGSL4vw_w6u=Kp&F5-XACB=U8cBFWeA7&X8SLW4HSA=ipL";
+        String url = "https://er3.ryeplacenta.com/?n7fBB_CMp7_y=5xm0&BtnLf8D=xR71&koODtsS=G8lW3bv&KTf=hU-PO&LI=7zQFk49w55j&umTbBu4";
         String jxwzDir = "/jxwz/";
         PageLoader pageLoader = new PageLoader(url,jxwzDir);
         pageLoader.start();
+        pageLoader.shutdown();
+    }
+
+    public void downloadResource(List<Curi> curiList, LoaderContext loaderContext, HttpClient httpClient){
+        for(Curi curi: curiList){
+            Future<LoaderResult> future = getThreadPoolExecutor().submit(new ResourceLoader(curi, loaderContext, httpClient));
+            checkFinish.put(curi.getUrl(), future);
+        }
     }
 
     public void printExtractLink(List<Curi> list){
@@ -148,11 +168,30 @@ public class PageLoader extends Thread{
         }
     }
 
-    public void printIndexHtml(Seed seed, LoaderContext loaderContext){
+    public static void replaceTextFile(Map<String, Map<String, String>> regexReplaceFile){
+        for(Map.Entry<String, Map<String, String>> entry: regexReplaceFile.entrySet()){
+            String filePath = entry.getKey();
+            Map<String, String> regexReplace = entry.getValue();
+            System.out.println("========当前文件路径：" + filePath + "，替换的链接数量：" + regexReplace.size());
+            try {
+                String textContent = FileUtils.readFileToString(new File(filePath), "utf-8");
+                for(Map.Entry<String, String> regexEntry: regexReplace.entrySet()){
+                    String regexHref = regexEntry.getKey();
+                    String newHref = regexEntry.getValue();
+                    textContent = textContent.replaceAll(regexHref, newHref);
+                }
+                writeTextFile(filePath, textContent);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    public static void writeTextFile(String savePath, String textContent){
         PrintWriter pw = null;
         try {
-            pw = new PrintWriter(new File(seed.getSeedIndexPath()));
-            pw.write(loaderContext.getHtml());
+            pw = new PrintWriter(new File(savePath));
+            pw.write(textContent);
             pw.flush();
         } catch (FileNotFoundException e) {
             e.printStackTrace();
@@ -163,8 +202,8 @@ public class PageLoader extends Thread{
         }
     }
 
-    public static List<Curi> getHtmlLinkTag(Seed seed, LoaderContext loaderContext){
-        List<String> linkTag = HtmlParser.commonReg(loaderContext.getHtml(), LoaderConfig.TAG_LINK_REG, 0);
+    public static List<Curi> getHtmlLinkTag(Seed seed){
+        List<String> linkTag = HtmlParser.commonReg(seed.getHtml(), LoaderConfig.TAG_LINK_REG, 0);
 
         StringBuilder linkText = new StringBuilder();
         for(String link:linkTag){
@@ -197,6 +236,8 @@ public class PageLoader extends Thread{
                 tmpUrl = tmpUrl.replaceAll("&amp;", "&");
             }
             curi.setUrl(tmpUrl);
+            curi.setDepth(1);
+            curi.setSourceFilePath(seed.getSeedIndexPath());
             curi.setSaveDir(seed.getCssSaveDir());
             curi.setContextType(ContextType.css);
             curiList.add(curi);
@@ -204,8 +245,8 @@ public class PageLoader extends Thread{
         return curiList;
     }
 
-    public static List<Curi> getHtmlScriptTag(Seed seed, LoaderContext loaderContext){
-        List<String> scriptTag = HtmlParser.commonReg(loaderContext.getHtml(), LoaderConfig.TAG_SCRIPT_REG, 0);
+    public static List<Curi> getHtmlScriptTag(Seed seed){
+        List<String> scriptTag = HtmlParser.commonReg(seed.getHtml(), LoaderConfig.TAG_SCRIPT_REG, 0);
         StringBuilder scriptText = new StringBuilder();
         for(String jsLink:scriptTag){
             scriptText.append(jsLink);
@@ -238,6 +279,8 @@ public class PageLoader extends Thread{
                 tmpUrl = tmpUrl.replaceAll("&amp;", "&");
             }
             curi.setUrl(tmpUrl);
+            curi.setDepth(1);
+            curi.setSourceFilePath(seed.getSeedIndexPath());
             curi.setSaveDir(seed.getJsSaveDir());
             curi.setContextType(ContextType.js);
             curiList.add(curi);
@@ -245,8 +288,8 @@ public class PageLoader extends Thread{
         return curiList;
     }
 
-    public static List<Curi> getHtmlImgTag(Seed seed, LoaderContext loaderContext){
-        List<String> imgTag = HtmlParser.commonReg(loaderContext.getHtml(), LoaderConfig.TAG_IMG_REG, 0);
+    public static List<Curi> getHtmlImgTag(Seed seed){
+        List<String> imgTag = HtmlParser.commonReg(seed.getHtml(), LoaderConfig.TAG_IMG_REG, 0);
         StringBuilder imgText = new StringBuilder();
         for(String imgLink:imgTag){
             imgText.append(imgLink);
@@ -278,13 +321,50 @@ public class PageLoader extends Thread{
             if(tmpUrl.contains("&amp;")){
                 tmpUrl = tmpUrl.replaceAll("&amp;", "&");
             }
-
             curi.setUrl(tmpUrl);
+            curi.setDepth(1);
+            curi.setSourceFilePath(seed.getSeedIndexPath());
             curi.setSaveDir(seed.getImgSaveDir());
             curi.setContextType(ContextType.img);
             curiList.add(curi);
         }
         return curiList;
+    }
+
+    public static List<Curi> getCssFileUrl(Seed seed, Curi parentCuri){
+        try {
+            String css = FileUtils.readFileToString(new File(parentCuri.getSavePath()), "utf-8");
+            List<String> cssUrlList = HtmlParser.commonReg(css, LoaderConfig.CSS_FILE_URL_REG, 1);
+            System.out.println("CSS 文件中URL数量：" + cssUrlList.size());
+            if(!cssUrlList.isEmpty()){
+                List<Curi> curiList = new ArrayList<>();
+                for(String cssUrl:cssUrlList){
+                    String tmpUrl = cssUrl;
+                    if(cssUrl == null){
+                        System.out.println("css中URL链接为空");
+                        continue;
+                    }
+                    Curi curi = new Curi();
+                    curi.setRawUrl(cssUrl);
+                    if(cssUrl.startsWith("/")){
+                        tmpUrl = seed.getHostUrl() + tmpUrl;
+                    }
+                    if(tmpUrl.contains("&amp;")){
+                        tmpUrl = tmpUrl.replaceAll("&amp;", "&");
+                    }
+                    curi.setUrl(tmpUrl);
+                    curi.setDepth(2);
+                    curi.setSourceFilePath(parentCuri.getSavePath());
+                    curi.setSaveDir(seed.getImgSaveDir());
+                    curi.setContextType(ContextType.css);
+                    curiList.add(curi);
+                }
+                return curiList;
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return null;
     }
 
     public static void getHtmlByHtmlUnit(Seed seed, LoaderContext loaderContext) {
@@ -322,13 +402,14 @@ public class PageLoader extends Thread{
             Page page = webClient.getPageCreator().createPage(webResponse, webClient.getCurrentWindow());
             HtmlPage htmlPage = (HtmlPage) page;
 
+            //记录cookie
             Set<Cookie> htmlUnitCookie = webClient.getCookies(myUrl);
             for(Cookie cookie:htmlUnitCookie){
                 loaderContext.addCookie(cookie.getName(), cookie.getValue(),
                         cookie.getDomain(), cookie.getPath(), cookie.getExpires());
             }
 
-            loaderContext.setHtml(htmlPage.asXml());
+            seed.setHtml(htmlPage.asXml());
         } catch (MalformedURLException e) {
             e.printStackTrace();
         } catch (IOException e) {
@@ -338,6 +419,7 @@ public class PageLoader extends Thread{
 
     public void shutdown() {
         shutdown = true;
+        getThreadPoolExecutor().destroy();
         synchronized (this) {
             notifyAll();
         }

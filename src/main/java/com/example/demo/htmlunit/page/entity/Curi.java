@@ -7,11 +7,12 @@ package com.example.demo.htmlunit.page.entity;
  */
 public class Curi {
 
-
     private String url;//请求地址
+    private int depth;//链接深度
     private String saveDir;//文件保存目录
     private String fileName;//文件名称
     private String savePath;//文件保存路径
+    private String sourceFilePath;//当前链接来源的文件路径
     private ContextType contextType;//资源类型
     private String rawUrl;//原始链接
     private String regexHref;//原始正则链接
@@ -23,6 +24,14 @@ public class Curi {
 
     public void setUrl(String url) {
         this.url = url;
+    }
+
+    public int getDepth() {
+        return depth;
+    }
+
+    public void setDepth(int depth) {
+        this.depth = depth;
     }
 
     public String getSaveDir() {
@@ -81,6 +90,14 @@ public class Curi {
         this.replaceHref = replaceHref;
     }
 
+    public String getSourceFilePath() {
+        return sourceFilePath;
+    }
+
+    public void setSourceFilePath(String sourceFilePath) {
+        this.sourceFilePath = sourceFilePath;
+    }
+
     @Override
     public String toString() {
         return "Curi{" +
@@ -88,6 +105,7 @@ public class Curi {
                 ", saveDir='" + saveDir + '\'' +
                 ", fileName='" + fileName + '\'' +
                 ", savePath='" + savePath + '\'' +
+                ", sourceFilePath='" + sourceFilePath + '\'' +
                 ", contextType=" + contextType +
                 ", rawUrl='" + rawUrl + '\'' +
                 ", regexHref='" + regexHref + '\'' +

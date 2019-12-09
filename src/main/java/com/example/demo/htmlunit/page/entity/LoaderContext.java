@@ -4,10 +4,7 @@ package com.example.demo.htmlunit.page.entity;
 import org.apache.http.cookie.Cookie;
 import org.apache.http.impl.cookie.BasicClientCookie;
 
-import java.util.Date;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -23,7 +20,9 @@ public class LoaderContext {
 
     private String referer;
 
-    private Map<String, String> indexHtmlRegexReplace = new ConcurrentHashMap<>();
+//    private Map<String, String> indexHtmlRegexReplace = new ConcurrentHashMap<>();
+
+    private Map<String, Map<String, String>> regexReplaceFile = new ConcurrentHashMap<>();
 
     public String getHtml() {
         return html;
@@ -49,12 +48,33 @@ public class LoaderContext {
         this.referer = referer;
     }
 
-    public Map<String, String> getIndexHtmlRegexReplace() {
+    /*public Map<String, String> getIndexHtmlRegexReplace() {
         return indexHtmlRegexReplace;
     }
 
     public void addIndexHtmlRegex(String key, String value){
         this.indexHtmlRegexReplace.put(key, value);
+    }
+    */
+
+    public Map<String, Map<String, String>> getRegexReplaceFile() {
+        return regexReplaceFile;
+    }
+
+    public void setRegexReplaceFile(Map<String, Map<String, String>> regexReplaceFile) {
+        this.regexReplaceFile = regexReplaceFile;
+    }
+
+    public void addRegexReplaceFile(String parentPath, String key, String value) {
+        if(parentPath != null){
+            if(regexReplaceFile.containsKey(parentPath)){
+                regexReplaceFile.get(parentPath).put(key, value);
+            }else {
+                Map<String, String> subRegex = new HashMap<>();
+                subRegex.put(key, value);
+                regexReplaceFile.put(parentPath, subRegex);
+            }
+        }
     }
 
     public void addCookie(String name, String value, String domain, String path, Date expires){

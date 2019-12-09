@@ -7,11 +7,11 @@ package com.example.demo.htmlunit.page.config;
  */
 public interface LoaderConfig {
 
-    String RESOURCE = "resources";
-    String DOUBLE_DOT = "..";
+    String RESOURCE_RELATIVE_CSS_DIR = "../css/";
+    String RESOURCE_RELATIVE_JS_DIR = "../js/";
+    String RESOURCE_RELATIVE_IMG_DIR = "../img/";
 
     //资源保存目录
-    String MAIN_DIR = "/snapshot/";
     String RESOURCE_CSS_DIR = "resources/css/";
     String RESOURCE_JS_DIR = "resources/js/";
     String RESOURCE_IMG_DIR = "resources/img/";

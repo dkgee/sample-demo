@@ -9,6 +9,8 @@ public class LoaderResult {
 
     private boolean result;//true：成功、false：失败
 
+    private Curi curi;//返回的curi结果
+
 
     public boolean isResult() {
         return result;
@@ -16,5 +18,13 @@ public class LoaderResult {
 
     public void setResult(boolean result) {
         this.result = result;
+    }
+
+    public Curi getCuri() {
+        return curi;
+    }
+
+    public void setCuri(Curi curi) {
+        this.curi = curi;
     }
 }

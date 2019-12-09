@@ -16,6 +16,7 @@ public class Seed {
     private String hostUrl;//主域名地址
 
     private String protocolHead;//协议头
+    private String html;//种子的html页
 
     private String mainDir;//文件保存目录
     private String seedFileDir;//种子文件保存目录
@@ -162,6 +163,14 @@ public class Seed {
         this.imgCount = imgCount;
     }
 
+    public String getHtml() {
+        return html;
+    }
+
+    public void setHtml(String html) {
+        this.html = html;
+    }
+
     @Override
     public String toString() {
         return "Seed{" +
@@ -169,6 +178,7 @@ public class Seed {
                 ", domain='" + domain + '\'' +
                 ", hostUrl='" + hostUrl + '\'' +
                 ", protocolHead='" + protocolHead + '\'' +
+                ", html='" + html + '\'' +
                 ", mainDir='" + mainDir + '\'' +
                 ", seedFileDir='" + seedFileDir + '\'' +
                 ", seedIndexPath='" + seedIndexPath + '\'' +
@@ -181,7 +191,7 @@ public class Seed {
                 '}';
     }
 
-    /* public static void main(String[] args) {
+/* public static void main(String[] args) {
         String url = "https://www.baidu.com/";
         String mainDir = "/jxwz/";
         Seed seed = new Seed(url, mainDir);

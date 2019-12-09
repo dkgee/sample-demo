@@ -1,27 +1,22 @@
 package com.example.demo.htmlunit.page.core;
 
 import com.example.demo.htmlunit.page.config.LoaderConfig;
-import com.example.demo.htmlunit.page.entity.Curi;
-import com.example.demo.htmlunit.page.entity.HtmlParser;
-import com.example.demo.htmlunit.page.entity.LoaderContext;
-import com.example.demo.htmlunit.page.entity.LoaderResult;
+import com.example.demo.htmlunit.page.entity.*;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.http.Header;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
 import org.apache.http.StatusLine;
 import org.apache.http.client.CookieStore;
+import org.apache.http.client.HttpClient;
 import org.apache.http.client.config.CookieSpecs;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.protocol.HttpClientContext;
-import org.apache.http.config.Registry;
-import org.apache.http.config.RegistryBuilder;
 import org.apache.http.cookie.Cookie;
-import org.apache.http.cookie.CookieSpecProvider;
 import org.apache.http.impl.client.BasicCookieStore;
 import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,9 +39,12 @@ public class ResourceLoader implements Resource{
 
     private LoaderContext loaderContext;
 
-    public ResourceLoader(Curi curi, LoaderContext loaderContext) {
+    private HttpClient httpClient;
+
+    public ResourceLoader(Curi curi, LoaderContext loaderContext, HttpClient httpClient) {
         this.curi = curi;
         this.loaderContext = loaderContext;
+        this.httpClient = httpClient;
     }
 
     @Override
@@ -58,30 +56,44 @@ public class ResourceLoader implements Resource{
             String newHref;
             switch (curi.getContextType()){
                 case js:
-                    newHref = LoaderConfig.RESOURCE_JS_DIR + curi.getFileName();
+                    if(curi.getDepth() == 2){
+                        newHref = LoaderConfig.RESOURCE_RELATIVE_JS_DIR + curi.getFileName();
+                    }else {
+                        newHref = LoaderConfig.RESOURCE_JS_DIR + curi.getFileName();
+                    }
                     break;
                 case img:
-                    newHref = LoaderConfig.RESOURCE_IMG_DIR + curi.getFileName();
+                    if(curi.getDepth() == 2){
+                        newHref = LoaderConfig.RESOURCE_RELATIVE_IMG_DIR + curi.getFileName();
+                    }else {
+                        newHref = LoaderConfig.RESOURCE_IMG_DIR + curi.getFileName();
+                    }
                     break;
                 case css:
                 default:
-                    newHref = LoaderConfig.RESOURCE_CSS_DIR + curi.getFileName();
+                    if(curi.getDepth() == 2){
+                        newHref = LoaderConfig.RESOURCE_RELATIVE_CSS_DIR + curi.getFileName();
+                    }else {
+                        newHref = LoaderConfig.RESOURCE_CSS_DIR + curi.getFileName();
+                    }
                     break;
             }
             String regexHref = HtmlParser.replaceUrlRegex(curi.getRawUrl());
             curi.setRegexHref(regexHref);
             curi.setReplaceHref(newHref);
-            loaderContext.addIndexHtmlRegex(regexHref, newHref);
+            loaderContext.addRegexReplaceFile(curi.getSourceFilePath(), regexHref, newHref);
+            loaderResult.setResult(true);
+            loaderResult.setCuri(curi);
         }else {
+            loaderResult.setResult(false);
             logger.warn("{} 未下载成功", curi.getUrl());
         }
-        loaderResult.setResult(true);
 
         return loaderResult;
     }
 
     //静态方法与非静态方法别
-    public static HttpGet initGetRequest(LoaderContext loaderContext, String url) throws URISyntaxException {
+    public HttpGet initGetRequest(LoaderContext loaderContext, String url) throws URISyntaxException {
         String tmpUrl = url.trim();
         URI uri = new URI(tmpUrl);
         HttpGet get = new HttpGet(uri);
@@ -111,7 +123,7 @@ public class ResourceLoader implements Resource{
         String url = curi.getUrl();
         try {
             HttpHost httpHost = new HttpHost("127.0.0.1", 1080);
-            HttpGet get = initGetRequest(loaderContext, url);
+            HttpGet httpRequest = initGetRequest(loaderContext, url);
             RequestConfig requestConfig;
             requestConfig = RequestConfig.custom()
                     .setSocketTimeout(100000)
@@ -119,21 +131,19 @@ public class ResourceLoader implements Resource{
                     .setConnectionRequestTimeout(100000).setCookieSpec(CookieSpecs.IGNORE_COOKIES)
                     .setProxy(httpHost)
                     .build();
-            get.setConfig(requestConfig);
+            httpRequest.setConfig(requestConfig);
 
-//            CookieStore cookieStore = new BasicCookieStore();
-//            if(!loaderContext.getCookieSet().isEmpty()){
-//                for(Cookie cookie: loaderContext.getCookieSet()){
-//                    cookieStore.addCookie(cookie);
-//                }
-//            }
+            CookieStore cookieStore = new BasicCookieStore();
+            if(!loaderContext.getCookieSet().isEmpty()){
+                for(Cookie cookie: loaderContext.getCookieSet()){
+                    cookieStore.addCookie(cookie);
+                }
+            }
 
-//            HttpClientContext context = HttpClientContext.create();
-//            context.setCookieStore(cookieStore);
-
-            CloseableHttpClient httpClient = HttpClients.createDefault();
+            HttpClientContext context = HttpClientContext.create();
+            context.setCookieStore(cookieStore);
             long stTime = System.currentTimeMillis();
-            HttpResponse httpResponse = httpClient.execute(get);
+            HttpResponse httpResponse = httpClient.execute(httpRequest, context);
 
             StatusLine statusLine = httpResponse.getStatusLine();
             if (statusLine.getStatusCode() == 200) {
@@ -146,8 +156,15 @@ public class ResourceLoader implements Resource{
                 //此处需要根据具体类型做判断
                 if(tmpLastSuffix.equals(".x-javascript") || tmpLastSuffix.equals(".javascript")){
                     tmpLastSuffix = ".js";
+                    curi.setContextType(ContextType.js);
                 }else if(tmpLastSuffix.equals(".plain")){
                     tmpLastSuffix = ".txt";
+                    curi.setContextType(ContextType.css);
+                }else if(tmpLastSuffix.equals(".css")){
+                    curi.setContextType(ContextType.css);
+                }else if(tmpLastSuffix.equals(".png") || tmpLastSuffix.equals(".jpg")
+                        || tmpLastSuffix.equals(".jpeg") || tmpLastSuffix.equals(".gif") || tmpLastSuffix.equals(".ico")){
+                    curi.setContextType(ContextType.img);
                 }else if(tmpLastSuffix.equals(".octet-stream")){
                     logger.error("暂时不支持该请求内容类型");
                     return;
@@ -189,8 +206,21 @@ public class ResourceLoader implements Resource{
             } else {
                 logger.info("下载失败！下载结果码:" + statusLine.getStatusCode());
             }
+            //请求头
+//            System.out.println("============Request===========");
+//            for(Header header: httpRequest.getAllHeaders()){
+//                System.out.println(header.getName() + ":" + header.getValue());
+//            }
+            //响应头
+//            System.out.println("============Response===========");
+//            for(Header header: httpResponse.getAllHeaders()){
+//                System.out.println(header.getName() + ":" + header.getValue());
+//            }
+//            System.out.println("=======================");
         } catch (Exception e) {
+            //请求头打印出来
             logger.error("下载失败," + e);
+            e.printStackTrace();
         }
     }
 }
